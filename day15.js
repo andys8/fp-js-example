@@ -11,70 +11,64 @@ const newPlayer = (type, x, y, elfCombatPoints) => ({
   hitpoints: 200
 });
 
+const mapIndexed = R.addIndex(R.map);
+const cellToPlayer = (cell, x, y, elfCombatPoints) =>
+  cell === "E" || cell === "G"
+    ? newPlayer(cell, x, y, elfCombatPoints)
+    : undefined;
+
+const linesToPlayers = elfCombatPoints =>
+  R.pipe(
+    mapIndexed((row, y) =>
+      mapIndexed((cell, x) => cellToPlayer(cell, x, y, elfCombatPoints), row)
+    ),
+    R.flatten,
+    R.reject(R.isNil)
+  );
+
 function parseInput(input, elfCombatPoints) {
-  const lines = input.split("\n");
-  const numRows = lines.length;
-  const numColumns = lines[0].length; // all rows have equal length
+  const inputToLines = R.split("\n");
+  const toCell = c => (c === "#" ? "#" : ".");
+  const linesToGrid = R.map(
+    R.pipe(
+      R.split(""),
+      R.map(toCell)
+    )
+  );
 
-  // The grid, containg walls and free spaces. Movable entites are not part of it.
-  const grid = new Array(numRows)
-    .fill()
-    .map(_ => new Array(numColumns).fill("."));
-
-  let x = 0,
-    y = 0;
-
-  const players = [];
-
-  for (const row of lines) {
-    x = 0;
-    for (let cell of row) {
-      switch (cell) {
-        case "#":
-          // A wall
-          grid[y][x] = cell;
-          break;
-
-        case "E":
-        case "G":
-          players.push(newPlayer(cell, x, y, elfCombatPoints));
-          break;
-      }
-
-      ++x;
-    }
-    ++y;
-  }
-
-  return { grid, numRows, numColumns, players };
+  const lines = inputToLines(input);
+  return {
+    grid: linesToGrid(lines),
+    players: linesToPlayers(elfCombatPoints)(lines)
+  };
 }
+
+const numGridRows = grid => grid.length;
+const numGridCols = grid => grid[0].length;
 
 const compareCoords = (a, b) => (a.y - b.y !== 0 ? a.y - b.y : a.x - b.x);
 const sortByCoord = xs => [...xs].sort(compareCoords);
 const sortByHitPoints = xs => [...xs].sort((a, b) => a.hitpoints - b.hitpoints);
 
+const isPosInGrid = (cols, rows) => pos =>
+  pos.x >= 0 && pos.x < cols && pos.y >= 0 && pos.y < rows;
+
+const isPosCoveredByWall = grid => pos => grid[pos.y][pos.x] === ".";
+
+const isPosWithNoPlayer = players => pos =>
+  !players.some(player => player.x === pos.x && player.y === pos.y);
+
 // Given a coordinate, finds free adjacent positions to it.
-function findAdjacentPositions(x, y, state) {
-  const positions = [
+const findAdjacentPositions = (x, y, state) =>
+  [
     { x: x - 1, y: y },
     { x: x + 1, y: y },
     { x: x, y: y - 1 },
     { x: x, y: y + 1 }
   ]
-    .filter(
-      pos =>
-        pos.x >= 0 &&
-        pos.x < state.numColumns &&
-        pos.y >= 0 &&
-        pos.y < state.numRows
-    ) // must be within grid
-    .filter(pos => state.grid[pos.y][pos.x] === ".") // must not be covered by a wall
-    .filter(
-      pos =>
-        !state.players.some(player => player.x === pos.x && player.y === pos.y)
-    ); // no player must be on that position
-  return positions;
-}
+    .filter(isPosInGrid(numGridCols(state.grid), numGridRows(state.grid)))
+    .filter(isPosCoveredByWall(state.grid))
+    .filter(isPosWithNoPlayer(state.players));
 
 // Finds positions from which a player of the given type (elf or goblin) can be attacked from.
 const findAttackPositions = (state, targetType) =>
@@ -101,13 +95,13 @@ const isEnemyOf = p1 => p2 => enemyType(p1.type) === p2.type;
 const areTargetsLeft = (state, player) => state.players.some(isEnemyOf(player));
 
 // Calculates the Manhattan distance between two coordinates.
-const distance = (x1, y1, x2, y2) => Math.abs(x1 - x2) + Math.abs(y1 - y2);
+const distance = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
 // Finds enemies a player can (from his current position) attack.
 const findAttackableEnemies = (state, player) =>
   state.players
     .filter(isEnemyOf(player))
-    .filter(t => distance(t.x, t.y, player.x, player.y) === 1);
+    .filter(t => distance(t, player) === 1);
 
 // Given the current state, a start position and a set of target positions, calculates the preferred
 // next move the player could make.
@@ -116,28 +110,24 @@ function findNextMove(state, start, targets) {
     return null;
   }
 
-  const grid = new Array(state.numRows)
-    .fill()
-    .map(_ => new Array(state.numColumns).fill(null));
-
   // Calculate and mark initial positions.
+  const grid = R.map(R.map(R.always(null)), state.grid);
+
+  // TODO: Remove loop
   let currentPositions = targets.map(t => ({ x: t.x, y: t.y }));
   for (const curPos of currentPositions) {
+    // TODO: Remove mutation
     grid[curPos.y][curPos.x] = 0;
   }
   grid[start.y][start.x] = -1;
 
+  // TODO: Remove loops and mutation
   for (let iteration = 1; ; ++iteration) {
-    // console.log(grid.map(row => row.map(cell => {
-    //     if (cell === null) return '.';
-    //     if (cell === -1) return 'S';
-    //     return cell;
-    // }).join('')).join('\n'), '\n\n');
-    let newPositions = [];
-    let finalPositions = [];
+    const newPositions = [];
+    const finalPositions = [];
 
     for (const curPos of currentPositions) {
-      if (distance(curPos.x, curPos.y, start.x, start.y) === 1) {
+      if (distance(curPos, start) === 1) {
         finalPositions.push(curPos);
       } else {
         for (const adjacent of findAdjacentPositions(
@@ -173,7 +163,7 @@ function findNextMove(state, start, targets) {
 function moveTowardsEnemy(state, player) {
   const nextStep = findNextMove(
     state,
-    { x: player.x, y: player.y },
+    player,
     findAttackPositions(state, enemyType(player.type))(state)
   );
 
@@ -187,7 +177,7 @@ function moveTowardsEnemy(state, player) {
 // If required, moves a given player towards the best possible enemies.
 // If a direct attack is possible, the player is not moved.
 function moveIfRequired(state, player) {
-  let attackable = findAttackableEnemies(state, player);
+  const attackable = findAttackableEnemies(state, player);
   if (attackable.length === 0) {
     moveTowardsEnemy(state, player);
   }
@@ -219,6 +209,7 @@ function act(state, player) {
 
   if (target.hitpoints <= 0) {
     // Remove killed player.
+    // TODO: Remove mutation
     state.players = state.players.filter(p => p !== target);
   }
 
@@ -241,13 +232,7 @@ function round(state) {
   return true;
 }
 
-function combat(state) {
-  for (let i = 0; ; ++i) {
-    if (!round(state)) {
-      return i;
-    }
-  }
-}
+const combat = (state, i = 0) => (round(state) ? combat(state, i + 1) : i);
 
 const totalPlayerHitPoints = R.pipe(
   R.map(R.prop("hitpoints")),
