@@ -176,6 +176,8 @@ function moveTowardsEnemy(state, player) {
     { x: player.x, y: player.y },
     findAttackPositions(state, enemyType(player.type))(state)
   );
+
+  // TODO: Remove mutation of player
   if (nextStep) {
     player.x = nextStep.x;
     player.y = nextStep.y;
@@ -193,6 +195,7 @@ function moveIfRequired(state, player) {
 
 // Calculates the fight between an attacker and a defendent.
 function fight(attacker, defendent) {
+  // TODO: Remove mutation
   defendent.hitpoints -= attacker.combatPoints;
 }
 
