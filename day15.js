@@ -28,7 +28,7 @@ function parseInput(input, elfCombatPoints) {
 
   for (const row of lines) {
     x = 0;
-    for (cell of row) {
+    for (let cell of row) {
       switch (cell) {
         case "#":
           // A wall
