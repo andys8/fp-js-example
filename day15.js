@@ -1,10 +1,6 @@
 const fs = require("fs");
 const input = fs.readFileSync("day15.input.txt", "utf8").trim();
 
-function debugLog() {
-  //console.log(...arguments);
-}
-
 function newPlayer(type, x, y, elfCombatPoints) {
   return {
     type,
@@ -223,11 +219,8 @@ function moveTowardsEnemy(state, player) {
     findAttackPositions(state, enemyType(player.type))
   );
   if (nextStep) {
-    debugLog("next step:", nextStep);
     player.x = nextStep.x;
     player.y = nextStep.y;
-  } else {
-    debugLog("no possible move");
   }
 }
 
@@ -236,7 +229,6 @@ function moveTowardsEnemy(state, player) {
 function moveIfRequired(state, player) {
   let attackable = findAttackableEnemies(state, player);
   if (attackable.length === 0) {
-    debugLog("no target adjacent, having to move");
     moveTowardsEnemy(state, player);
   }
 }
@@ -252,27 +244,22 @@ function act(state, player) {
     return false;
   }
 
-  debugLog(`Acting: ${player.type} (${player.x}, ${player.y})`);
   moveIfRequired(state, player);
 
   let attackable = findAttackableEnemies(state, player);
   if (attackable.length === 0) {
-    debugLog("nothing I can do");
     return true;
   }
 
-  debugLog("can attack an enemy");
   const attackPriorities = sortPlayers(attackable).sort(
     (a, b) => a.hitpoints - b.hitpoints
   );
   const target = attackPriorities[0];
-  debugLog("attacking", target);
 
   fight(player, target);
 
   if (target.hitpoints <= 0) {
     // Remove killed player.
-    debugLog("I killed an enemy");
     state.players = state.players.filter(p => p !== target);
   }
 
@@ -297,12 +284,9 @@ function round(state) {
 
 function combat(state) {
   for (let i = 0; ; ++i) {
-    //console.log(`>>> Iteration ${i}`);
     if (!round(state)) {
       return i;
     }
-
-    //render(state);
   }
 }
 
@@ -313,49 +297,28 @@ function outcome(state, iterations) {
   return iterations * hitPointSum;
 }
 
-// Expected result: Combat ends after 72 full rounds. Result: 196200.
 function part1() {
   state = parseInput(input, 3);
-  //render(state);
   const iterations = combat(state);
-  console.log(
-    `Combat ends after ${iterations} full rounds. Result: ${outcome(
-      state,
-      iterations
-    )}.`
-  );
+  const result = outcome(state, iterations);
+  return result;
 }
 
-// With 17 combat points, the elves win without any losses after 50 iterations.
-// Outcome: 61750.
 function part2() {
   for (let combatPoints = 4; ; ++combatPoints) {
     state = parseInput(input, combatPoints);
-    //render(state);
-
     const numInitialElves = state.players.filter(p => p.type === "E").length;
-
     const iterations = combat(state);
-
     const numFinalElves = state.players.filter(p => p.type === "E").length;
     if (numFinalElves === numInitialElves) {
-      console.log(
-        `With ${combatPoints} combat points, the elves win without any losses after ${iterations} iterations.`
-      );
-      console.log(`Outcome: ${outcome(state, iterations)}.`);
-      break;
-    } else {
-      console.log(
-        `With ${combatPoints} combat points, the ${numInitialElves -
-          numFinalElves} elves are lost after ${iterations} iterations.`
-      );
+      const result = outcome(state, iterations);
+      return result;
     }
   }
-  state = parseInput(input, 3);
 }
 
-console.log("Part 1:");
-part1();
+const runTest = (name, fn, expected) =>
+  console.log(`Test ${name} ${fn() === expected ? "worked" : "failed"}`);
 
-console.log("\nPart 2:");
-part2();
+runTest("Part 1", part1, 222831)
+runTest("Part 2", part2, 59245)
