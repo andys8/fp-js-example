@@ -1,0 +1,22 @@
+{
+  "name": "fp-js-example",
+  "version": "1.0.0",
+  "description": "",
+  "main": "day15.js",
+  "scripts": {
+    "test": "node day15.spec.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andys8/fp-js-example.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/andys8/fp-js-example/issues"
+  },
+  "homepage": "https://github.com/andys8/fp-js-example#readme",
+  "dependencies": {
+    "ramda": "0.26.1"
+  }
+}

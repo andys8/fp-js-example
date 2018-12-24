@@ -1,19 +1,18 @@
 const fs = require("fs");
+const R = require("ramda");
+
 const input = fs.readFileSync("day15.input.txt", "utf8").trim();
 
-function newPlayer(type, x, y, elfCombatPoints) {
-  return {
-    type,
-    x,
-    y,
-    combatPoints: type === "E" ? elfCombatPoints : 3,
-    hitpoints: 200
-  };
-}
+const newPlayer = (type, x, y, elfCombatPoints) => ({
+  type,
+  x,
+  y,
+  combatPoints: type === "E" ? elfCombatPoints : 3,
+  hitpoints: 200
+});
 
 function parseInput(input, elfCombatPoints) {
   const lines = input.split("\n");
-
   const numRows = lines.length;
   const numColumns = lines[0].length; // all rows have equal length
 
@@ -50,40 +49,9 @@ function parseInput(input, elfCombatPoints) {
   return { grid, numRows, numColumns, players };
 }
 
-function render(state) {
-  // Create a copy of the grid, where players can then be inserted.
-  const copy = state.grid.map(row => [...row]);
-
-  // Add players.
-  for (player of state.players) {
-    copy[player.y][player.x] = player.type;
-  }
-
-  console.log(copy.map(row => row.join("")).join("\n"));
-}
-
-// Comparator that puts coordinates in 'reading order'.
-function compareCoords(x1, y1, x2, y2) {
-  let res = y1 - y2;
-  if (res === 0) {
-    res = x1 - x2;
-  }
-  return res;
-}
-
-// Returns a sorted copy of the players array.
-function sortPlayers(players) {
-  const sorted = [...players];
-  sorted.sort((a, b) => compareCoords(a.x, a.y, b.x, b.y));
-  return sorted;
-}
-
-// Returns a sorted copy of the given positions.
-function sortPositions(positions) {
-  const sorted = [...positions];
-  sorted.sort((a, b) => compareCoords(a.x, a.y, b.x, b.y));
-  return sorted;
-}
+const compareCoords = (a, b) => (a.y - b.y !== 0 ? a.y - b.y : a.x - b.x);
+const sortByCoord = xs => [...xs].sort(compareCoords);
+const sortByHitPoints = xs => [...xs].sort((a, b) => a.hitpoints - b.hitpoints);
 
 // Given a coordinate, finds free adjacent positions to it.
 function findAdjacentPositions(x, y, state) {
@@ -108,16 +76,15 @@ function findAdjacentPositions(x, y, state) {
   return positions;
 }
 
-// Finds positions from which a player of the given type (elf or goblin) can
-// be attacked from.
-function findAttackPositions(state, targetType) {
+// Finds positions from which a player of the given type (elf or goblin) can be attacked from.
+const findAttackPositions = (state, targetType) => {
   const positions = [];
-  for (const player of state.players.filter(p => p.type === targetType)) {
+  const playersWithType = state.players.filter(p => p.type === targetType);
+  for (const player of playersWithType) {
     positions.push(...findAdjacentPositions(player.x, player.y, state));
   }
-
   return positions;
-}
+};
 
 // Given a player type, returns the type of the player's enemy.
 function enemyType(type) {
@@ -199,7 +166,7 @@ function findNextMove(state, start, targets) {
     // If any of the new positions is the start position, we're done.
     if (finalPositions.length > 0) {
       // Return preferred coordinate.
-      return sortPositions(finalPositions)[0];
+      return sortByCoord(finalPositions)[0];
     }
 
     // If no new possible positions have been added, there obviously is no path to any of the targets.
@@ -251,9 +218,7 @@ function act(state, player) {
     return true;
   }
 
-  const attackPriorities = sortPlayers(attackable).sort(
-    (a, b) => a.hitpoints - b.hitpoints
-  );
+  const attackPriorities = sortByHitPoints(sortByCoord(attackable));
   const target = attackPriorities[0];
 
   fight(player, target);
@@ -268,7 +233,7 @@ function act(state, player) {
 
 function round(state) {
   // Determine order of players in this round.
-  const players = sortPlayers(state.players);
+  const players = sortByCoord(state.players);
 
   for (const player of players) {
     // Is player still in the game? It could already have been killed.
@@ -317,8 +282,4 @@ function part2() {
   }
 }
 
-const runTest = (name, fn, expected) =>
-  console.log(`Test ${name} ${fn() === expected ? "worked" : "failed"}`);
-
-runTest("Part 1", part1, 222831)
-runTest("Part 2", part2, 59245)
+module.exports = { part1, part2 };
