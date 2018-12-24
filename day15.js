@@ -77,14 +77,12 @@ function findAdjacentPositions(x, y, state) {
 }
 
 // Finds positions from which a player of the given type (elf or goblin) can be attacked from.
-const findAttackPositions = (state, targetType) => {
-  const positions = [];
-  const playersWithType = state.players.filter(p => p.type === targetType);
-  for (const player of playersWithType) {
-    positions.push(...findAdjacentPositions(player.x, player.y, state));
-  }
-  return positions;
-};
+const findAttackPositions = (state, targetType) =>
+  R.pipe(
+    R.prop("players"),
+    R.filter(R.propEq("type", targetType)),
+    R.chain(({ x, y }) => findAdjacentPositions(x, y, state))
+  );
 
 // Given a player type, returns the type of the player's enemy.
 function enemyType(type) {
@@ -98,25 +96,18 @@ function enemyType(type) {
   }
 }
 
-function areEnemies(player1, player2) {
-  return player1.type === enemyType(player2.type);
-}
+// Returns whether there are still targets of the given player left on the field.
+const isEnemyOf = p1 => p2 => enemyType(p1.type) === p2.type;
+const areTargetsLeft = (state, player) => state.players.some(isEnemyOf(player));
 
 // Calculates the Manhattan distance between two coordinates.
-function distance(x1, y1, x2, y2) {
-  return Math.abs(x1 - x2) + Math.abs(y1 - y2);
-}
+const distance = (x1, y1, x2, y2) => Math.abs(x1 - x2) + Math.abs(y1 - y2);
 
 // Finds enemies a player can (from his current position) attack.
-function findAttackableEnemies(state, player) {
-  const targets = state.players.filter(p => p.type === enemyType(player.type));
-  return targets.filter(t => distance(t.x, t.y, player.x, player.y) === 1);
-}
-
-// Returns whether there are still targets of the given player left on the field.
-function areTargetsLeft(state, player) {
-  return state.players.some(p => areEnemies(p, player));
-}
+const findAttackableEnemies = (state, player) =>
+  state.players
+    .filter(isEnemyOf(player))
+    .filter(t => distance(t.x, t.y, player.x, player.y) === 1);
 
 // Given the current state, a start position and a set of target positions, calculates the preferred
 // next move the player could make.
@@ -183,7 +174,7 @@ function moveTowardsEnemy(state, player) {
   const nextStep = findNextMove(
     state,
     { x: player.x, y: player.y },
-    findAttackPositions(state, enemyType(player.type))
+    findAttackPositions(state, enemyType(player.type))(state)
   );
   if (nextStep) {
     player.x = nextStep.x;
@@ -213,7 +204,7 @@ function act(state, player) {
 
   moveIfRequired(state, player);
 
-  let attackable = findAttackableEnemies(state, player);
+  const attackable = findAttackableEnemies(state, player);
   if (attackable.length === 0) {
     return true;
   }
@@ -255,31 +246,36 @@ function combat(state) {
   }
 }
 
-function outcome(state, iterations) {
-  const hitPointSum = state.players
-    .map(p => p.hitpoints)
-    .reduce((a, b) => a + b, 0);
-  return iterations * hitPointSum;
-}
+const totalPlayerHitPoints = R.pipe(
+  R.map(R.prop("hitpoints")),
+  R.sum
+);
 
-function part1() {
-  state = parseInput(input, 3);
+const outcome = (players, iterations) =>
+  iterations * totalPlayerHitPoints(players);
+
+const part1 = () => {
+  const state = parseInput(input, 3);
   const iterations = combat(state);
-  const result = outcome(state, iterations);
-  return result;
-}
+  return outcome(state.players, iterations);
+};
 
-function part2() {
-  for (let combatPoints = 4; ; ++combatPoints) {
-    state = parseInput(input, combatPoints);
-    const numInitialElves = state.players.filter(p => p.type === "E").length;
-    const iterations = combat(state);
-    const numFinalElves = state.players.filter(p => p.type === "E").length;
-    if (numFinalElves === numInitialElves) {
-      const result = outcome(state, iterations);
-      return result;
-    }
-  }
-}
+const isElv = R.propEq("type", "E");
+const countElves = R.pipe(
+  R.filter(isElv),
+  R.length
+);
+
+const part2 = (combatPoints = 4) => {
+  const state = parseInput(input, combatPoints);
+  const numInitialElves = countElves(state.players);
+
+  const iterations = combat(state);
+  const numFinalElves = countElves(state.players);
+
+  return numFinalElves === numInitialElves
+    ? outcome(state.players, iterations)
+    : part2(combatPoints + 1);
+};
 
 module.exports = { part1, part2 };

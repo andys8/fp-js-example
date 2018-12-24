@@ -1,4 +1,5 @@
 const { part1, part2 } = require("./day15");
+
 const runTest = (name, fn, expected) =>
   console.log(`Test ${name} ${fn() === expected ? "worked" : "failed"}`);
 
